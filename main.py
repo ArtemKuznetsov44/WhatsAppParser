@@ -31,6 +31,70 @@ import keyword
 '''
 
 
+class ChromeDriver:
+    """ Class for working with ChromeDriver in selenium """
+
+    def __init__(self, hidden: bool):
+        self.__driver = webdriver.Chrome(
+            service=self.__configure_service(),
+            options=self.__configure_options(hidden)
+        )
+
+    def close(self) -> None:
+        """ Method to close driver """
+        self.__driver.close()
+
+    def quite(self) -> None:
+        """ Method to quit driver """
+        self.__driver.quit()
+
+    def wait_for_element(self, x_path: str, timeout: int = 10) -> WebElement:
+        """ Method with a timeout and x_path of element which we are waiting for """
+        return wait(self.__driver, timeout).until(EC.presence_of_element_located(
+            (By.XPATH, x_path)
+        ))
+
+    def wait_for_element_and_click(self, x_path: str, timeout: int = 10) -> None:
+        """ 1 - Waiting the element 2 - Click on it"""
+        self.wait_for_element(x_path, timeout).click()
+
+    def find_elements_by_xpath(self, x_path) -> list[WebElement]:
+        """ Returns element on page by x_path """
+        return self.__driver.find_elements(By.XPATH, x_path)
+
+    def find_element_by_xpath(self, x_path) -> WebElement:
+        """ Returns the list of elements on page by x_path of them """
+        return self.__driver.find_element(By.XPATH, x_path)
+
+    @property
+    def driver(self):
+        """ GET property of private class field - driver"""
+        return self.__driver
+
+    @staticmethod
+    def __configure_options(hidden: bool) -> webdriver.ChromeOptions:
+        """ Static method for making some options configurations """
+        chrome_options = webdriver.ChromeOptions()
+
+        if hidden:
+            chrome_options.add_argument('--headless=new')
+
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option("useAutomationExtension", False)
+
+        return chrome_options
+
+    @staticmethod
+    def __configure_service() -> webdriver.ChromeService:
+        """ Static method for making some service configurations """
+        # 'nt' - the os name for windows:
+        if os.name == 'nt':
+            return webdriver.ChromeService(executable_path='drivers/windows/chrome/chromedriver.exe')
+
+        # 'posix' - the os name for linux and mac.
+        return webdriver.ChromeService(executable_path='drivers/linux/chrome/chromedriver')
+
+
 class WhatsAppParser:
     """ WhatsApp parser class:
     1. show_all_options() - method for getting list of options
@@ -166,7 +230,7 @@ class WhatsAppParser:
 
         except NoSuchElementException:
             pass
-       
+
         try:
             images = element.find_elements(By.XPATH,
                                            './/img[@class="jciay5ix tvf2evcx oq44ahr5 lb5m6g5c osz0hll6 nq7eualt em5jvqoa a21kwdn32"]')
