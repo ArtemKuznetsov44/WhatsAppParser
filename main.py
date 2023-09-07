@@ -147,24 +147,8 @@ class WhatsAppParser:
         self.__driver.close()
         self.__driver.quit()
 
-    # # This method is not working correct now... Reason - I don't know...
-    # def __auth_by_cookies(self):
-    #     for cookie in pickle.load(open('cookies', 'rb')):
-    #         self.__driver.add_cookie(cookie)
-    #
-    #     sleep(5)
-    #     self.__driver.refresh()
-    #     sleep(5)
-
     def open(self):
         self.__driver.get('https://web.whatsapp.com')
-
-        # if os.path.exists('cookies'):
-        #     self.__auth_by_cookies()
-        #     self.__searchbar = self.__driver.find_element(By.XPATH,
-        #     '/html/body/div[1]/div/div/div[4]/div/div[1]/div/div/div[2]/div/div[1]/p')
-        #     self.__panel_side = self.__driver.find_element(By.XPATH, '//*[@id="pane-side"]')
-        # else:
 
         # ожидаем, когда прогрузится страница с диалогами, и находим строку поиска
         self.__searchbar = wait(self.__driver, 60).until(EC.presence_of_element_located(
