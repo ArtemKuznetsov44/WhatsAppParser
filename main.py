@@ -1,24 +1,13 @@
 from selenium import webdriver
-from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait as wait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, ElementNotInteractableException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException
 # For make locator specification:
 from selenium.webdriver.common.by import By
-from fake_useragent import UserAgent
-from bs4 import BeautifulSoup as BS
-from time import sleep
-import datetime as dt
-# from tqdm import tqdm
-import re
-import webbrowser
-import threading
-import time
-import pickle
-from console import os, console_clear
-import keyword
+from selenium.webdriver.remote.webelement import WebElement
 
+from chrome_driver import ChromeDriver
+# from tqdm import tqdm
+from console import os, console_clear
+from time import sleep
 # Данный класс выступает в роли контекстного процессора, который при старте входит на страницу
 # WatsApp, ожидает появление строки поиска (т.е. ждет, пока пользователь отсканирует QR).
 # План работы программы:
@@ -26,73 +15,9 @@ import keyword
 '''
 План работы программы: 
 1. При старте - подгружается страница с QR (программа ожидает появления элемента по XPath - строки поиска диалога, т.е.
-когда пользователь его отсканирует и войдет в аккаунт)
+когда пользователь его от сканирует и войдет в аккаунт)
 2. 
 '''
-
-
-class ChromeDriver:
-    """ Class for working with ChromeDriver in selenium """
-
-    def __init__(self, hidden: bool):
-        self.__driver = webdriver.Chrome(
-            service=self.__configure_service(),
-            options=self.__configure_options(hidden)
-        )
-
-    def close(self) -> None:
-        """ Method to close driver """
-        self.__driver.close()
-
-    def quite(self) -> None:
-        """ Method to quit driver """
-        self.__driver.quit()
-
-    def wait_for_element(self, x_path: str, timeout: int = 10) -> WebElement:
-        """ Method with a timeout and x_path of element which we are waiting for """
-        return wait(self.__driver, timeout).until(EC.presence_of_element_located(
-            (By.XPATH, x_path)
-        ))
-
-    def wait_for_element_and_click(self, x_path: str, timeout: int = 10) -> None:
-        """ 1 - Waiting the element 2 - Click on it"""
-        self.wait_for_element(x_path, timeout).click()
-
-    def find_elements_by_xpath(self, x_path) -> list[WebElement]:
-        """ Returns element on page by x_path """
-        return self.__driver.find_elements(By.XPATH, x_path)
-
-    def find_element_by_xpath(self, x_path) -> WebElement:
-        """ Returns the list of elements on page by x_path of them """
-        return self.__driver.find_element(By.XPATH, x_path)
-
-    @property
-    def driver(self):
-        """ GET property of private class field - driver"""
-        return self.__driver
-
-    @staticmethod
-    def __configure_options(hidden: bool) -> webdriver.ChromeOptions:
-        """ Static method for making some options configurations """
-        chrome_options = webdriver.ChromeOptions()
-
-        if hidden:
-            chrome_options.add_argument('--headless=new')
-
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option("useAutomationExtension", False)
-
-        return chrome_options
-
-    @staticmethod
-    def __configure_service() -> webdriver.ChromeService:
-        """ Static method for making some service configurations """
-        # 'nt' - the os name for windows:
-        if os.name == 'nt':
-            return webdriver.ChromeService(executable_path='drivers/windows/chrome/chromedriver.exe')
-
-        # 'posix' - the os name for linux and mac.
-        return webdriver.ChromeService(executable_path='drivers/linux/chrome/chromedriver')
 
 
 class WhatsAppParser:
@@ -109,31 +34,12 @@ class WhatsAppParser:
     }
 
     def __init__(self, hidden=False):
-        self.__get_driver_with_options(hidden)
-        self.__ready_for_search = False
+        self.__driver = ChromeDriver(hidden)
         self.__searchbar = None
         self.__chats_panel = None
 
-    # Initialize searching driver:
-    def __get_driver_with_options(self, hidden: bool):
-        # UserAgent instance (for changing useragent param for browser)
-        user_agent = UserAgent()
-
-        chrome_options = webdriver.ChromeOptions()
-        # chrome_options.add_argument(f'user-agent={UserAgent.chrome}')
-
-        # This options for disabling flag WebDriver-mode for our browser:
-        # chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option("useAutomationExtension", False)
-
-        # Getting our ChromeWebDriver object with specified service and options:
-        self.__driver = webdriver.Chrome(
-            service=self.__get_service_by_os(),
-            options=chrome_options
-        )
-
     # Method that is called when we create context manager with <WITH>:
+
     def __enter__(self):
         self.open()
         return self
@@ -148,52 +54,53 @@ class WhatsAppParser:
         self.__driver.quit()
 
     def open(self):
+        """ Method for get in WhatsApp web application |  Notice: User have only 60 secs for scan QR-code and get in """
+
         self.__driver.get('https://web.whatsapp.com')
 
-        # ожидаем, когда прогрузится страница с диалогами, и находим строку поиска
-        self.__searchbar = wait(self.__driver, 60).until(EC.presence_of_element_located(
-            (By.XPATH, '/html/body/div[1]/div/div/div[4]/div/div[1]/div/div/div[2]/div/div[1]/p')))
-
-        self.__chats_panel = wait(self.__driver, 60).until(
-            EC.presence_of_element_located((By.XPATH, '//div[@class="_3YS_f _2A1R8" and @aria-label="Chat list"]')))
-
-        # pickle.dump(self.__driver.get_cookies(), open('cookies', 'wb'))
-
-        if self.__searchbar is not None and self.__chats_panel is not None:
-            self.__ready_for_search = True
+        if self.__driver.wait_for_element(
+                '/html/body/div[1]/div/div/div[4]/div/div[1]/div/div/div[2]/div/div[1]/p',
+                60) is None:
+            raise NoSuchElementException
 
     # Method for getting all messages from specified dialog only:
     def get_all_from_specified_dialog(self, contact: str):
-        self.__driver.find_element(By.XPATH,
-                                   f'//div[@class="_8nE1Y"]/div[@role="gridcell"]/div[@class="_21S-L"]/span[@title="{contact}"]').click()
-        sleep(60)
+        """ Main method for operations with getting data from current dialog """
+        # Wait and click for SPECIFIED contact:
+        self.__driver.wait_for_element_and_click(
+            f'//div[@class="_8nE1Y"]/div[@role="gridcell"]/div[@class="_21S-L"]/span[@title="{contact}"]',
+            timeout=30)
 
-        dialog_data = (self.__driver.find_element(
-            By.XPATH, '//*[@id="main"]/div[2]/div/div[2]/div[3]').
-        find_elements(
-            By.XPATH,
-            './/div[contains(@class, "_1jHIY") and contains(@class, "_2OvAm") and contains(@class, "focusable-list-item")]/div/span | .//div[@class="" and @role="row"]'
-        )
-        )
+        sleep(2)
 
-        d = {}
-        current_date = ""
-        d_for_row = {}
-        count_per_date = 1
-
-        for el in dialog_data:
-
-            if el.get_attribute('class') == "_11JPr" and el.text not in d:
-                current_data = el.text.strip()
-                d[current_data] = list()
-                count_per_date = 0
-
-            d[current_data].append(self.__get_message_content(element=el, number=count_per_date))
-            count_per_date += 1
-
-        return d
+        # For remaking and rebuilding !
+        # dialog_data = (self.__driver.find_element(
+        #     By.XPATH, '//*[@id="main"]/div[2]/div/div[2]/div[3]').
+        # find_elements(
+        #     By.XPATH,
+        #     './/div[contains(@class, "_1jHIY") and contains(@class, "_2OvAm") and contains(@class, "focusable-list-item")]/div/span | .//div[@class="" and @role="row"]'
+        # )
+        # )
+        #
+        # d = {}
+        # current_date = ""
+        # d_for_row = {}
+        # count_per_date = 1
+        #
+        # for el in dialog_data:
+        #
+        #     if el.get_attribute('class') == "_11JPr" and el.text not in d:
+        #         current_data = el.text.strip()
+        #         d[current_data] = list()
+        #         count_per_date = 0
+        #
+        #     d[current_data].append(self.__get_message_content(element=el, number=count_per_date))
+        #     count_per_date += 1
+        #
+        # return d
 
     def __get_message_content(self, element: WebElement, number: int):
+        """ Method for work with current message like bs instance """
 
         from_user_to_you = False
         images = None
